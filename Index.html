@@ -1,0 +1,291 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset=utf-8>
+        <meta name=description content="">
+        <meta name=viewport content="width=device-width, initial-scale=1">
+        <title>Mortgage Additional Payment Calculator</title>
+        <link rel="stylesheet" href="css/normalize.css">
+        <link rel="stylesheet" href="css/main.css">
+        <link rel="stylesheet" href="css/jquery-ui-1.10.0.custom.min.css">
+        <link rel=author href="humans.txt">
+        <!--[if gte IE 9]>
+          <style type="text/css">
+            .gradient {
+               filter: none;
+            }
+          </style>
+        <![endif]-->
+    </head>
+    <body>
+        <div id="banner">
+            <div id="menu">
+                <div class="menuBars">
+                    <div class="menuBar"></div>
+                    <div class="menuBar"></div>
+                    <div class="menuBar"></div>                    
+                </div>
+                <div id="monthlyPaymentInfo" data-bind="text: '$' + monthlyPayment() + ' Monthly'"></div>
+                <div class="clearFix"></div>
+            </div>
+        </div>
+        <div id="options">
+            <div class="menuOption">
+                <input type="checkbox" id="chkLoanForm" checked="checked"> Loan Form</input>
+            </div>
+            <div class="menuOption">
+                <input type="checkbox" id="chkPaymentSchedule"> Payment Schedule</input>
+            </div>                        
+        </div>
+        <!--END BANNER-->
+        <div class="mortgageInfo">            
+            <div id="mtgInfoForm"> 
+                <section id="instructions" style="color:darkblue;">
+                    Fill in the below information and click Submit to:
+                    <ul>
+                        <li>View full payment schedule!</li>
+                        <li>Calculate extra payment (recurring and one-time) impact!</li>
+                        <li>Adjust loan details on the fly!</li>
+                        <li>View interactive charts and graphs!</li>
+                    </ul>
+                </section>               
+                <form >
+                    <div class="field">
+                        <label for="initialMtgBalance">Initial Loan Amount:</label>
+                        <input title="Amount initially financed after down payments, etc... (ex: 100,000.00)" type="number" id="initialMtgBalance" data-bind="event: {change: resetVMVals}" required/>
+                        <div class="clearFix"></div>
+                    </div>
+                    <div class="field">
+                        <label for="APR">APR:</label>
+                        <input title="APR in ##.### format, must be less than 30. (ex: 3.725)" id="APR" data-bind="event: {change: resetVMVals}" required pattern="([0-9]|[1-2][0-9])(\.\d*)?"/>
+                        <div class="clearFix"></div>
+                    </div>
+                    <div class="field">
+                        <label for="termYears">Term Years: </label>
+                        <input title="Initial number of years to amortize the loan over" type="number" id="termYears" data-bind="event: {change: resetVMVals}" required/>    
+                        <div class="clearFix"></div>
+                    </div>
+                    <div class="field">
+                        <label for="initialPaymentDate">First Payment Date: </label>
+                        <input title="Date of first payment for this loan" type="text" id="initialPaymentDate" data-bind="event: {change: resetVMVals}" required/>
+                        <div class="clearFix"></div>
+                    </div>
+                   <!--  <div class="field" id="monthlyPaymentLabel" style="display:none;color:darkblue;">
+                        <label>Monthly Payment: </label>
+                        <label title="Monthly payment - not including insurance, taxes, etc... as may apply." 
+                            data-bind="text: '$' + monthlyPayment()">
+                        </label>
+                        <div class="clearFix"></div>
+                    </div> -->
+                    <div id="loanFormInvalid" style="display: none;color: red; text-align: center;clear: both;">All fields are required</div>
+                    <input type="submit" text="Submit" value="Submit"/>
+                    <div id="loadingGearImg"></div>
+                    <div class="clearFix"></div>
+                </form>             
+            </div>
+        </div>
+
+        <div id="tabs" style="display:none;">
+            <ul>
+                <li><a href="#amSchedule">Payment Schedule</a></li>
+                <li id="diagramsMainTab"><a href="#diagrams">Data Visualization</a></li>
+            </ul>
+
+            <div id="amSchedule">
+                <div id="recurringExtraPaymentsContainer" data-bind="template: { name: 'recurringExtraPaymentsTemplate' }">
+
+                </div>
+
+                <div class="paymentContainer" data-bind="template: { name: 'paymentScheduleTemplate', foreach: years}">
+                    
+                </div>
+                <div class="finalPaymentContainer" data-bind="template: { name: 'finalPaymentTemplate' }">
+                    
+                </div>  
+            </div>
+
+            <div id="diagrams">
+                <div id="diagramTabs">
+                    <ul>
+                        <li><a href="#pies">Overview Pies</a></li>
+                        <li id="lineChartTab"><a href="#lines">Comparison Lines</a></li>
+                    </ul>
+                    
+                    <div id="pies">
+                        <div>
+                            <div class="pieTitle">Not Including Extra Payments</div>
+                            <div id="pieWithoutExtraPayments" class="pie"></div>
+                            <div class="clearFix"></div>
+                        </div>
+                        <div>
+                            <div class="pieTitle">Including Extra Payments</div>
+                            <div id="pieWithExtraPayments" class="pie"></div>
+                            <div class="clearFix"></div>
+                        </div>
+                        <div style="clear: both; height:1px;"></div>
+                    </div>
+
+                    <div id="lines">
+                        <div class="lineTitle">Detailed Indicators - With and Without Extra Payments</div>
+                        <div id="lineWithExtraPayments" class="lineChart"></div>
+                    </div>
+                </div>                
+            </div>            
+        </div>
+        
+        <script type="text/html" id="recurringExtraPaymentsTemplate" >
+            <h3 class="recurringHeader">Recurring Extra Payments</h3>
+            <div class="recurringData">                
+                <table data-bind="visible: recurringExtraPayments().length > 0">
+                    <tbody>
+                        <tr class="recurringDataHeader gradient">
+                            <td><label>Starting</label></td>
+                            <td></td>
+                            <td><label>Ending</label></td>
+                            <td></td>
+                            <td><label>Amount</label></td>
+                            <td></td>
+                        </tr>
+                        <!-- ko foreach: recurringExtraPayments -->
+                        <tr class="recurringDataRow">
+                            <td>
+                                <label data-bind="text: startingMonth().name + ' ' + startingYear().year" ></label>
+                            </td>
+                            <td></td>
+                            <td>
+                                <label data-bind="text: endingMonth().name + ' ' + endingYear().year" ></label>
+                            </td>
+                            <td></td>
+                            <td>
+                                <label data-bind="text: amount()" ></label>
+                            </td>
+                            <td>
+                                <input type="button" text="Delete" value="Delete" data-bind="click: $root.deleteRecurringExtraPayment"/>
+                            </td>
+                        </tr>                     
+                        <!-- /ko -->    
+                    </tbody>
+                </table>
+                <div data-bind="visible: recurringExtraPayments().length < 1">There are currently no recurring extra payments.</div>
+                <div id="newRecurringPaymentSection">
+                    <div data-bind="visible: newRecurringExtraPaymentForm()">
+                        <form data-bind="submit: addNewRecurringExtraPayment">
+                            <select title="Starting year for this series of extra payments" id="selectedStartYear" 
+                                data-bind="options: $root.years, optionsText: 'year', 
+                                           value: selectedStartYear, optionsCaption: '--Starting Year--'"/>
+                            <!-- ko if: selectedStartYear -->
+                            <select title="Starting month for this series of extra payments" id="selectedStartMonth" 
+                                data-bind="options: selectedStartYear().months, optionsText: 'name', 
+                                           value: selectedStartMonth, optionsCaption: '--Starting Month--'"/>
+                            <!-- /ko -->
+                            <br/>
+                            <select title="Final year for this series of extra payments" id="selectedEndYear" 
+                                data-bind="options: years, optionsText: 'year', 
+                                           value: selectedEndYear, optionsCaption: '--Ending Year--'"/>
+                            <!-- ko if: selectedEndYear -->
+                            <select title="Final month for this series of extra payments" id="selectedEndMonth" 
+                                data-bind="options: selectedEndYear().months, optionsText: 'name', 
+                                            value: selectedEndMonth, optionsCaption: '--Ending Month--'"/>
+                            <!-- /ko -->
+                            <br/>
+                            <input title="Dollar amount for the payments in this series" type="text" data-bind="value: newRecurringPaymentAmount, valueUpdate: 'afterkeydown'" required pattern="\d+(\.\d*)?"/>
+                            <input type="submit" text="Submit" value="Submit" />
+                            <input type="button" text="Cancel" value="Cancel" data-bind="click: hideNewRecurringExtraPayment"/>
+                            <div class="clearFix"></div>
+                        </form>
+                    </div>
+                    <div style="margin-bottom:5px;" data-bind="visible: !newRecurringExtraPaymentForm()">
+                        <input  id="addNewRecurringExtraPaymentBtn" type="button" text="Add" value="Add" data-bind="click: showNewRecurringExtraPayment" />
+                        &nbsp;
+                        <input style="margin-left:10px;" id="deleteAllRecurringExtraPaymentsBtn" type="button" text="Clear All" value="Delete All" data-bind="visible: recurringExtraPayments().length > 0,click: deleteAllRecurringExtraPayments" />
+                    </div>
+                    <div style="padding:5px;width:95%;" data-bind="if: newRecurringExtraPaymentError">
+                        <div class="newRecurringExtraPaymentError" data-bind="text: newRecurringExtraPaymentError" />
+                    </div>
+                </div>
+            </div>
+        </script>
+
+        <script type="text/html" id="paymentScheduleTemplate">
+            <div>
+                <h3 class="yearHeader" data-bind="text: year"></h3>
+
+                <div class="yearMonths">
+                    <table>
+                        <tr class="monthHeader gradient">
+                            <td><div class="monthName">Month</div></td>
+                            <td><label class="startingBalance">Starting Balance</label></td>
+                            <td><label class="scheduledPayment">Scheduled Payment</label></td>
+                            <td><label class="interestPaid">Interest Paid</label></td>
+                            <td><label class="principalPaid">Principal Paid</label></td>
+                            <td><label class="extraPayments">Extra Payments</label></td>
+                            <td><label class="endingBalance">Ending Balance</label></td>
+                        </tr>
+                        <!-- ko foreach: months -->
+                        <tr class="monthData">
+                            <td>
+                                <div class="monthName" data-bind="text: name"></div>
+                            </td>
+                            <td>
+                                <div class="startingBalance" data-bind="text: '$' + startingBalance()"></div>
+                            </td>
+                            <td>
+                                <div class="scheduledPayment" data-bind="text: '$' + $root.scheduledMonthlyPayment"></div>
+                            </td>
+                            <td>
+                                <div class="interestPaid" data-bind="text: '$' + interest()"></div>
+                            </td>
+                            <td>
+                                <div class="principalPaid" data-bind="text: '$' + principal()"></div>
+                            </td>
+                            <td>
+                                <div class="extraPayments" 
+                                    data-bind="text: '$' + extraPayment(), 
+                                    click: $root.showExtraPayment, visible: !viewExtraPayment()">
+                                </div>
+                                <div class="extraPaymentsContainer" data-bind="visible: viewExtraPayment">
+                                    <form>
+                                        <input style="width: 75px;" name="newExtraPaymentAmt" type="text" data-bind="value: $root.currentExtraPayment, valueUpdate: 'afterkeydown'" title="Extra payment amount in ###.## format. (ex: 1,000.00)" required />
+                                        <input type="submit" text="OK" value="OK" data-bind="enable: $root.currentExtraPayment().length > 0, 
+                                            click: function(data, event) { $root.updateExtraPayment(data, $parent); }"/>
+                                        <input type="button" data-bind="click: $root.hideExtraPayments" text="Cancel" value="Cancel" />
+                                        <div class="clearFix"></div>
+                                    </form>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="endingBalance" data-bind="text: '$' + endingBalance()"></div>
+                            </td>
+                        </tr>
+                        <!-- /ko --> 
+                        <tr class="yearFooter gradient">
+                            <td>Year Totals: </td>
+                            <td></td>
+                            <td></td>
+                            <td><div class="totalInterest" data-bind="text: '$' + $root.getYearsTotals($data).totalInterest.toFixed(2)"></div></td>
+                            <td><div class="totalPrincipal" data-bind="text: '$' + $root.getYearsTotals($data).totalPrincipal.toFixed(2)"></div></td>
+                            <td><div class="totalExtra" data-bind="text: '$' + $root.getYearsTotals($data).totalExtra.toFixed(2)"></div></td>
+                            <td></td>
+                        </tr>                      
+                    </table>
+                </div>
+            </div>
+        </script>
+
+        <script type="text/html" id="finalPaymentTemplate">
+            <h3 class="finalPayment" data-bind="text: 'Final Payment: $' + $root.finalPayment()"></h3>
+        </script>
+
+        
+
+        <script type="text/javascript" src="scripts/moment.min.js"></script>
+        <script type="text/javascript" src="scripts/jquery-1.9.1.min.js"></script>
+        <script type="text/javascript" src="scripts/jquery.flot.js"></script>
+        <script type="text/javascript" src="scripts/jquery.flot.pie.js"></script>
+        <script tyep="text/javascript" src="scripts/jquery-ui-1.10.1.custom.min.js"></script>
+        <script type="text/javascript" src="scripts/knockout-2.2.1.js"></script>
+        <script type="text/javascript" src="scripts/init.js"></script>
+        <script type="text/javascript" src="scripts/chartObjects.js"></script>
+        <script type="text/javascript" src="scripts/main.js"></script>
+    </body>
+</html>
